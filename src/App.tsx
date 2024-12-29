@@ -128,7 +128,9 @@ function App() {
           } ${result.xun} ${result.name || "某某某"} \n ${result.kuan}`}</h1>
         </>
       )}
-      <footer>© 2024 by may.w.</footer>
+      <footer>
+        © 2024 by may.w. 查詢結果僅供參考，不負任何法律責任。
+      </footer>
     </>
   );
 }
