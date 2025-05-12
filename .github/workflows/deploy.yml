@@ -1,4 +1,4 @@
-name: Build and Deploy Vue App to EC2
+name: Build and Deploy React App to EC2
 
 on:
   push:
@@ -23,22 +23,38 @@ jobs:
         run: |
           docker build -t lo-kwan-generator .
 
-      # 4. 儲存 Docker 映像檔並上傳至 EC2
+      # 4. 儲存 Docker 映像檔
       - name: Save Docker image as tar
-        run: |
-          docker save lo-kwan-generator > lo-kwan-generator.tar
+        run: docker save lo-kwan-generator > lo-kwan-generator.tar
 
-      # 5. 將映像檔傳到 EC2
+      # 5. 建立 SSH 私鑰檔案
+      - name: Create SSH key file
+        run: |
+          echo "${{ secrets.SERVER_KEY }}" > server_key.pem
+          chmod 600 server_key.pem
+
+      # 6. 上傳 Docker 映像檔至 EC2
       - name: Upload Docker image to EC2
         run: |
-          scp -i ${{ secrets.SERVER_KEY }} lo-kwan-generator.tar ec2-user@${{ secrets.SERVER_HOST }}:/tmp/
+          scp -o StrictHostKeyChecking=no -i server_key.pem lo-kwan-generator.tar ec2-user@${{ secrets.SERVER_HOST }}:/tmp/
 
-      # 6. 在 EC2 上拉取 Docker 映像檔並啟動容器
+      # 7. 在 EC2 上部署 Docker 容器
       - name: Deploy Docker image on EC2
         run: |
-          ssh -i ${{ secrets.SERVER_KEY }} ec2-user@${{ secrets.SERVER_HOST }} << 'EOF'
-            # 解壓 Docker 映像檔
-            docker load < /lo-kwan-generator.tar
-            # 啟動 Docker 容器，將容器的 80 端口映射到 EC2 主機的 80 端口
-            docker run -d -p 80:80 lo-kwan-generator
+          ssh -i server_key.pem ec2-user@${{ secrets.SERVER_HOST }} << 'EOF'
+            # 確保 Docker 正常運行
+            sudo systemctl start docker
+            # 載入 Docker 映像檔
+            docker load -i /tmp/lo-kwan-generator.tar
+            # 確保沒有已存在的容器
+            docker stop lo-kwan-generator || true
+            docker rm lo-kwan-generator || true
+            # 啟動新的 Docker 容器
+            docker run -d --name lo-kwan-generator -p 80:80 lo-kwan-generator
           EOF
+
+      # 8. 清理本地檔案
+      - name: Cleanup
+        run: |
+          rm server_key.pem
+          rm lo-kwan-generator.tar
