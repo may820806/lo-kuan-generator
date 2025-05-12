@@ -112,7 +112,7 @@ function App() {
           <h2>你的名字</h2>
           <input
             type="text"
-            placeholder="例: 翁韻婷"
+            placeholder="例: 謝爾頓"
             value={result.name}
             onChange={(e) => setResult({ ...result, name: e.target.value })}
           />

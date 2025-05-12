@@ -1,0 +1,44 @@
+name: Build and Deploy Vue App to EC2
+
+on:
+  push:
+    branches:
+      - main  # 當 main 分支有更新時觸發
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest  # 使用 GitHub Actions 預設的 Ubuntu Runner
+
+    steps:
+      # 1. 檢出最新程式碼
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. 安裝 Docker
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      # 3. 建立 Docker 映像檔
+      - name: Build Docker image
+        run: |
+          docker build -t lo-kwan-generator .
+
+      # 4. 儲存 Docker 映像檔並上傳至 EC2
+      - name: Save Docker image as tar
+        run: |
+          docker save lo-kwan-generator > lo-kwan-generator.tar
+
+      # 5. 將映像檔傳到 EC2
+      - name: Upload Docker image to EC2
+        run: |
+          scp -i ${{ secrets.SERVER_KEY }} lo-kwan-generator.tar ec2-user@${{ secrets.SERVER_HOST }}:/tmp/
+
+      # 6. 在 EC2 上拉取 Docker 映像檔並啟動容器
+      - name: Deploy Docker image on EC2
+        run: |
+          ssh -i ${{ secrets.SERVER_KEY }} ec2-user@${{ secrets.SERVER_HOST }} << 'EOF'
+            # 解壓 Docker 映像檔
+            docker load < /lo-kwan-generator.tar
+            # 啟動 Docker 容器，將容器的 80 端口映射到 EC2 主機的 80 端口
+            docker run -d -p 80:80 lo-kwan-generator
+          EOF
