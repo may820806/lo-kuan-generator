@@ -20,6 +20,6 @@ FROM nginx:alpine AS production
 # 把建置好的 dist 檔案放到 nginx 的根目錄
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-EXPOSE 3000
+EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
