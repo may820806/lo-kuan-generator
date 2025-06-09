@@ -13,13 +13,3 @@ RUN npm install
 COPY . .
 
 RUN npm run build
-
-# 用來包image而已 不是用在host domain
-FROM nginx:alpine AS production
-
-# 把建置好的 dist 檔案放到 nginx 的根目錄
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]

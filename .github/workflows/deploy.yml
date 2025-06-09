@@ -1,60 +1,38 @@
-name: Build and Deploy React App to EC2
+name: Deploy React App
 
 on:
   push:
     branches:
-      - main  # 當 main 分支有更新時觸發
+      - main
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest  # 使用 GitHub Actions 預設的 Ubuntu Runner
-
+  deploy:
+    runs-on: ubuntu-latest
     steps:
-      # 1. 檢出最新程式碼
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. 安裝 Docker
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v2
-
-      # 3. 建立 Docker 映像檔
-      - name: Build Docker image
+      - name: Build React app
         run: |
-          docker build -t lo-kwan-generator .
+          npm install
+          npm run build
 
-      # 4. 儲存 Docker 映像檔
-      - name: Save Docker image as tar
-        run: docker save lo-kwan-generator > lo-kwan-generator.tar
-
-      # 5. 建立 SSH 私鑰檔案
       - name: Create SSH key file
         run: |
           echo "${{ secrets.SERVER_KEY }}" > server_key.pem
           chmod 600 server_key.pem
 
-      # 6. 上傳 Docker 映像檔至 EC2
-      - name: Upload Docker image to EC2
+      - name: Upload build files to EC2
         run: |
-          scp -o StrictHostKeyChecking=no -i server_key.pem lo-kwan-generator.tar ec2-user@${{ secrets.SERVER_HOST }}:/tmp/
+          scp -o StrictHostKeyChecking=no -i server_key.pem -r dist/* ec2-user@${{ secrets.SERVER_HOST }}:~/deploy_tmp/
 
-      # 7. 在 EC2 上部署 Docker 容器
-      - name: Deploy Docker image on EC2
+      - name: Deploy on EC2
         run: |
-          ssh -i server_key.pem ec2-user@${{ secrets.SERVER_HOST }} << 'EOF'
-            # 確保 Docker 正常運行
-            sudo systemctl start docker
-            # 載入 Docker 映像檔
-            docker load -i /tmp/lo-kwan-generator.tar
-            # 確保沒有已存在的容器
-            docker stop lo-kwan-generator || true
-            docker rm lo-kwan-generator || true
-            # 啟動新的 Docker 容器
-            docker run -d --name lo-kwan-generator -p 80:80 lo-kwan-generator
+          ssh -o StrictHostKeyChecking=no -i server_key.pem ec2-user@${{ secrets.SERVER_HOST }} << 'EOF'
+            sudo rm -rf /usr/share/nginx/html/*
+            sudo cp -r ~/deploy_tmp/* /usr/share/nginx/html/
+            sudo chown -R nginx:nginx /usr/share/nginx/html/
           EOF
 
-      # 8. 清理本地檔案
       - name: Cleanup
-        run: |
-          rm server_key.pem
-          rm lo-kwan-generator.tar
+        run: rm server_key.pem
